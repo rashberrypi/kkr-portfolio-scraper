@@ -1,0 +1,37 @@
+version: '3.8'
+services:
+  # MongoDB Service
+  mongodb:
+    image: mongo:latest
+    container_name: kkr_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  # NestJS App Service
+  app:
+    build: .
+    container_name: kkr_app
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+    volumes:
+      - .:/usr/src/appx
+      - /usr/src/app/node_modules
+    environment:
+      - PORT=8080
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    command: npm run start:dev -- --watch
+
+volumes:
+  mongo_data:
