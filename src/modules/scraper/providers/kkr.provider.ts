@@ -1,27 +1,52 @@
-async scrape() {
-  let allCompanies = [];
-  let page = 1;
-  let hasMore = true;
+import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
 
-  while (hasMore) {
-    // The URL you provided
-    const url = `https://www.kkr.com/content/kkr/sites/global/en/invest/portfolio/jcr:content/root/main-par/bioportfoliosearch.bioportfoliosearch.json?page=${page}&sortParameter=name&sortingOrder=asc`;
+@Injectable()
+export class KkrProvider {
+  private readonly logger = new Logger(KkrProvider.name);
+  private readonly baseUrl = 'https://www.kkr.com/content/kkr/sites/global/en/invest/portfolio/jcr:content/root/main-par/bioportfoliosearch.bioportfoliosearch.json';
 
-    const response = await axios.get(url);
-    const data = response.data;
+  async scrape() {
+    this.logger.log('🚀 Starting KKR data sync...');
+    let allResults: any[] = [];
+    let currentPage = 1;
+    let totalPages = 1;
 
-    // KKR's JSON usually has a 'results' or 'items' array
-    // Adjust 'data.results' based on the actual JSON keys
-    const items = data.results || data.items || [];
+    try {
+      do {
+        this.logger.log(`📥 Fetching page ${currentPage} of ${totalPages}...`);
 
-    if (items.length === 0) {
-      hasMore = false;
-    } else {
-      allCompanies.push(...items);
-      page++;
-      // Safety break to prevent infinite loops during testing
-      if (page > 25) hasMore = false;
+        const response = await axios.get(this.baseUrl, {
+          params: {
+            page: currentPage,
+            sortParameter: 'name',
+            sortingOrder: 'asc'
+          }
+        });
+
+        const data = response.data;
+
+        // Set total pages from the API response on the first call
+        if (currentPage === 1) {
+          totalPages = data.pages || 1;
+          const totalHits = data.hits || 0;
+          this.logger.log(`✅ Found ${totalHits} total items across ${totalPages} pages.`);
+        }
+
+        if (data.results && Array.isArray(data.results)) {
+          allResults.push(...data.results);
+        }
+
+        currentPage++;
+
+      } while (currentPage <= totalPages);
+
+      this.logger.log(`✨ Successfully collected ${allResults.length} companies from KKR.`);
+      return allResults;
+
+    } catch (error) {
+      this.logger.error(`❌ Error scraping KKR: ${error.message}`);
+      throw error;
     }
   }
-  return allCompanies;
 }

@@ -4,6 +4,19 @@ import { Model } from 'mongoose';
 import { Portfolio } from '../portfolio/schemas/portfolio.schema';
 import { KkrProvider } from './providers/kkr.provider';
 
+
+interface KkrCompany {
+  sortingName: string;
+  name: string;
+  url: string;
+  hq: string;
+  industry: string;
+  region: string;
+  description: string;
+  yoi: string;
+  assetClass: string;
+}
+
 @Injectable()
 export class ScraperService {
   private readonly logger = new Logger(ScraperService.name);
@@ -14,8 +27,8 @@ export class ScraperService {
   ) {}
 
   async syncKkr() {
-    const rawResults = await this.kkrProvider.scrape();
-    
+    const rawResults = await this.kkrProvider.scrape() as KkrCompany[];
+
     for (const item of rawResults) {
       await this.portfolioModel.updateOne(
         { externalId: item.sortingName }, // Search by the unique sortingName

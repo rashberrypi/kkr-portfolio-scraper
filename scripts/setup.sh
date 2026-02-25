@@ -22,18 +22,18 @@ docker-compose up --build -d
 
 # 5. Wait for API to be ready
 echo "⏳ Waiting for API to be healthy..."
-until $(curl --output /dev/null --silent --head --fail http://localhost:3000/health); do
+until curl -s -I http://localhost:8080/health | grep "200 OK" > /dev/null; do
     printf '.'
     sleep 2
 done
 
-echo -e "\n✅ API is live!"
+echo -e "\n✅ App is live on http://localhost:8080/api"
 
 # 6. Trigger Sync (Only if you want it to run on every start)
 echo "🔄 Triggering KKR Sync..."
-curl -X POST http://localhost:3000/scraper/sync/kkr
+curl -X POST http://localhost:8080/scraper/sync/kkr
 
 echo ""
 echo "🎉 Development environment is ready!"
-echo "• Swagger UI: http://localhost:3000/api"
-echo "• Health:     http://localhost:3000/health"
+echo "• Swagger UI: http://localhost:8080/api"
+echo "• Health:     http://localhost:8080/health"
