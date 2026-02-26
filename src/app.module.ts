@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller'; 
 import { PortfolioModule } from './modules/portfolio/portfolio.module';
 import { ScraperModule } from './modules/scraper/scraper.module';
+import { PersonModule } from './modules/person/person.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ScraperModule } from './modules/scraper/scraper.module';
     }),
     PortfolioModule,
     ScraperModule,
+    PersonModule
   ],
   controllers: [AppController], 
   providers: [],

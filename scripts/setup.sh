@@ -29,7 +29,7 @@ done
 
 echo -e "\n✅ App is live on http://localhost:8080/api"
 
-# 6. Trigger Sync 
+# 6. Trigger Sync (Only if you want it to run on every start)
 echo "🔄 Triggering KKR Sync..."
 curl -X POST http://localhost:8080/scraper/sync/kkr
 

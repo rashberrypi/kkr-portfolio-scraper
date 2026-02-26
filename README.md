@@ -128,7 +128,7 @@ Implement a basic Sentiment/Category tag (e.g., "Expansion", "Layoffs", "M&A").
 
 Goal: Provide the "Why" behind the company's current status.
 
-**optional add apoloo api at this stage**
+**i can optional add apoloo api at this stage**
 
 Step 2.3: The SEC 8-K Parser (P3)
 Scrape ir.kkr.com  for the latest filings.
