@@ -97,3 +97,54 @@ Once the core pipeline is stabilized, we move from **Data Collection** to **Insi
 * **Playwright Scraper**: Target "Leadership" pages of PortCo sites.
 * **Apollo.io Adapter**: Fetch employee headcount to identify high-growth assets.
 * **Aggregated Analytics**: DB views for industry dominance and regional shifts.
+
+## Phase 2: The "Depth" Phase (Current Focus)
+
+* **Step 2.1:** The People Engine (P1)
+Fetch the paginated JSON from the KKR People API.
+
+Create a "Worker" to visit individual bio URLs using the first-lastname pattern.
+
+Extract: Role, Team, Board Seats (mapped to PortCo names), and Bio text.
+
+Goal: Cross-reference which KKR Executive "controls" which Portfolio Company.
+
+
+
+
+
+
+
+
+
+
+
+Step 2.2: The News & Market Signal Wrapper (P2)
+Integrate Bing News Search API filtered by "{PortCo Name} + KKR".
+
+Extract: Article Title, URL, Publication Date, and a "Snippet."
+
+Implement a basic Sentiment/Category tag (e.g., "Expansion", "Layoffs", "M&A").
+
+Goal: Provide the "Why" behind the company's current status.
+
+**optional add apoloo api at this stage**
+
+Step 2.3: The SEC 8-K Parser (P3)
+Scrape ir.kkr.com  for the latest filings.
+
+Focus specifically on 8-K (Current Report) forms as they trigger for "Material Events" (Acquisitions, Dispositions, Departures).
+
+Use an LLM (Qwen) to extract: "Event Type" and "Financial Impact Summary."
+
+Goal: Formal regulatory verification of portfolio changes.
+
+Phase 3: The "Active Intelligence" Phase (Future)
+Step 3.1: Playwright Scrapers
+Playwright scrapers for individual PortCo websites (Extracting product lists/client logos).
+
+Step 3.2: Apollo/Proxycurl Integration
+Integration of Apollo/Proxycurl for validated headcount and technographic data.
+
+Step 3.3: The "Drift" Engine
+"Drift" Engine: Logic to compare the original KKR thesis vs. current news/website data.
