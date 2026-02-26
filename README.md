@@ -1,12 +1,11 @@
 # KKR Portfolio Intelligence Pipeline (PoC)
-
-A production-ready data pipeline and REST API designed to transform KKR’s public portfolio data into a structured, trackable, and programmatically accessible asset.
+Once the core pipeline is stabilized, we move from **Data Collection** to **Insight Generation**:
 
 ---
 
 ## ## Problem Statement
 
-KKR’s portfolio pages offer rich information for manual browsing, but lack the structure required for deep analysis. Manual data entry is non-scalable and prevents **automation, historical tracking, or integration** with internal dashboards and AI agents. This project bridges the gap between unstructured web content and actionable intelligence.
+A GP's (KKR) portfolio pages offer rich information for manual browsing, but lack the structure required for deep analysis. Manual data entry is non-scalable and prevents **automation, historical tracking, or integration** with internal dashboards and AI agents. This project bridges the gap between unstructured web content and actionable intelligence.
 
 ## ## Goal
 
@@ -19,34 +18,24 @@ Deliver a robust service that:
 
 ## ## Use Cases
 
-* **Analysts**: Query and export up‑to‑date portfolio slices (by asset class, industry, region) and view aggregates for reporting.
-* **Data Teams**: Integrate a stable API contract into internal dashboards and scheduled workflows.
-* **Engineers/AI**: Utilize clean schemas to power automated agentic workflows and deal-sourcing tools.
-
+-  **Analysts**: query and export up‑to‑date(wth version tracking) portfolio slices (by asset class, industry, region) and view aggregates for reporting.
+-  **Engineers/AI**:  clean schemas to power automated agentic workflows and deal-sourcing tools.
+- **People Mapping** : portCos mapped to decison makers to predict trends and decisions
 ---
 
-## ## Tech Stack & Architecture
+## ## Current Tech Stack & Architecture
 
 * **Framework**: NestJS (Modular, Scalable TypeScript)
 * **Database**: MongoDB (Flexible JSON-native storage)
 * **API**: Swagger/OpenAPI for documentation and testing.
 * **DevOps**: Docker + Docker Compose (With Watch mode).
-
+- Frontend scope -  a dashboard ui with qwen support to allow human language querying on our Mongo via NLP 
 ---
 
 ## ## Data Model Overview
-
-We utilize a **Single-Table Inheritance** approach to allow for future integration of other GPs (e.g., Blackstone, Carlyle) within the same collection.
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `source_gp` | String | Discriminator (e.g., "KKR") |
-| `external_id` | String | Unique ID from source to prevent duplicates |
-| `basics` | Object | HQ, Industry, Region, Description |
-| `investment` | Object | Entry Year, Asset Class |
-| `sync_metadata` | Object | `last_seen`, `is_active` (for exit detection) |
-
----
+ - Read Schema - 
+    - person
+    - portfolio
 
 ## ## Getting Started
 
@@ -56,6 +45,7 @@ Clone the repository and create a .env file with your credentials:
 Bash
 MONGODB_URI=mongodb://localhost:27017/kkr-portfolio
 PORT=3000
+
 2. Quick Start (Automated)
 Run the setup script to build containers, verify health, and trigger the initial data sync automatically:
 
@@ -69,11 +59,11 @@ If you prefer manual control:
 
 Bash
 docker-compose up --build
-Navigate to http://localhost:3000/api/docs to manually trigger syncs via the /admin/sync/kkr endpoint.
+Navigate to http://localhost:3000/api/ to manually trigger syncs 
 
 ## ## Project Status & Roadmap
 
-### **PoC Task Tracker**
+### **Phase 1 Task Sumary**
 
 | Task | Category | Status | Notes |
 | --- | --- | --- | --- |
@@ -83,41 +73,31 @@ Navigate to http://localhost:3000/api/docs to manually trigger syncs via the /ad
 | **KKR API Seeder** | Core Engine | ✅ Complete | Handles pagination & upsert logic. |
 | **REST Endpoints** | API Access | ✅ Complete | List, Filter, and Detail views active. |
 | **Base Schema** | Data Model | ✅ Complete | Basics + Investment fields implemented. |
-| **Enrichment Fields** | Data Model | 🟦 To-Do | Stubbing schema for News/Social data. |
-| **Bing/Apollo Adapters** | Enrichment | 🟦 To-Do | Scheduled for Phase 2. |
-| **ChangeLog/History** | Tracking | 🟦 To-Do | Logic for tracking entry/exit dates. |
-| **Slack Alerts** | DevOps | 🟦 To-Do | Notification for new PortCo detections. |
-
 ---
 
-## ## Phase 2 Preview
-
-Once the core pipeline is stabilized, we move from **Data Collection** to **Insight Generation**:
+### **Phase 2 Preview (depreceated)** 
 
 * **Playwright Scraper**: Target "Leadership" pages of PortCo sites.
 * **Apollo.io Adapter**: Fetch employee headcount to identify high-growth assets.
 * **Aggregated Analytics**: DB views for industry dominance and regional shifts.
 
-## Phase 2: The "Depth" Phase (Current Focus)
+## Phase 2: The "data enrichment" Phase -
 
 * **Step 2.1:** The People Engine (P1)
-Fetch the paginated JSON from the KKR People API.
+- Fetch the paginated JSON from the KKR People API. (done)
+    - it uses a unique slug to indentify people - slug uitli = name+sourceGP.. will need more robust ids for scale (preferably a public unique id)
+    - bio page will lead us to description.
+    - these names wiht KKR tag can be used to fetch content from secform4.com to get personal investment details
+    - tracxn has some enriching portco-peopel mapping data
+
+
+
+## **Not Implemented ->**
+- add a version control to log changes in data fiels (next)
 
 Create a "Worker" to visit individual bio URLs using the first-lastname pattern.
-
-Extract: Role, Team, Board Seats (mapped to PortCo names), and Bio text.
-
+Extract: Role, Team, 
 Goal: Cross-reference which KKR Executive "controls" which Portfolio Company.
-
-
-
-
-
-
-
-
-
-
 
 Step 2.2: The News & Market Signal Wrapper (P2)
 Integrate Bing News Search API filtered by "{PortCo Name} + KKR".
