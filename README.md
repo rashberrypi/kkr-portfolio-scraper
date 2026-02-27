@@ -128,3 +128,29 @@ Integration of Apollo/Proxycurl for validated headcount and technographic data.
 
 Step 3.3: The "Drift" Engine
 "Drift" Engine: Logic to compare the original KKR thesis vs. current news/website data.
+
+
+## ## People Engine Architecture - 
+
+KKR People List Page
+        │
+        ▼
+  Scraper Service (existing)
+  fetches /our-people/{slug}
+        │
+        ▼
+        BATCH people
+  Gemini Flash (free tier)
+  structured extraction prompt
+  → returns JSON: { portcos[], role, dates, priorFirms, education }
+        │
+        ▼
+  Enrichment Service (NestJS)
+        ├─► Upsert Person (rawBiography + parsed fields)
+        ├─► Fuzzy match portCo name → Portfolio collection
+        │     (if no match → create stub Portfolio with syncStatus: 'stub')
+        └─► Upsert PersonPortCo junction documents
+
+
+Gemini Batching - batch 50 people. KKR has ~600 people → only 12 Gemini calls total for a full scrape. Well within 1500/day free limit. Leaves room for retries without burning quota.
+The prompt returns an array of 50 results keyed by personSlug so you can match results back to inputs exactly.
