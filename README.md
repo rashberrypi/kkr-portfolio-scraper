@@ -35,24 +35,19 @@ Deliver a robust service that:
 ## ## Data Model Overview
  - Read Schema - 
     - person
-    - portfolio
+    - portfolio (hardcoded sourceGP as KKR for now - change when scaling)
 
 ## ## Getting Started
 
 1. Setup Environment
-Clone the repository and create a .env file with your credentials:
+Clone the repository and create a .env file and add GEMINI api key:
 
-Bash
 MONGODB_URI=mongodb://localhost:27017/kkr-portfolio
-PORT=3000
+PORT=8080
+GEMINI_API_KEY=
 
-2. Quick Start (Automated)
-Run the setup script to build containers, verify health, and trigger the initial data sync automatically:
-
-Bash
-chmod +x ./scripts/setup.sh
-./scripts/setup.sh
-Once complete, access the data immediately at: http://localhost:8080/api/portfolios
+2. Quick Start (Automated) on Bash-
+just -> npm run setup
 
 3. Manual Spin Up
 If you prefer manual control:
@@ -67,19 +62,14 @@ Navigate to http://localhost:3000/api/ to manually trigger syncs
 
 | Task | Category | Status | Notes |
 | --- | --- | --- | --- |
-| **NestJS Scaffold** | Infrastructure | ✅ Complete | Project initialized with TypeScript. |
-| **MongoDB Connection** | Infrastructure | ✅ Complete | Mongoose integration active. |
-| **Docker Compose** | Infrastructure | ✅ Complete | Includes NestJS (Watch Mode) + Mongo. |
-| **KKR API Seeder** | Core Engine | ✅ Complete | Handles pagination & upsert logic. |
-| **REST Endpoints** | API Access | ✅ Complete | List, Filter, and Detail views active. |
-| **Base Schema** | Data Model | ✅ Complete | Basics + Investment fields implemented. |
+| **NestJS Scaffold** | Infrastructure |  Complete | Project initialized with TypeScript. |
+| **MongoDB Connection** | Infrastructure |  Complete | Mongoose integration active. |
+| **Docker Compose** | Infrastructure |  Complete | Includes NestJS (Watch Mode) + Mongo. |
+| **KKR API Seeder** | Core Engine |  Complete | Handles pagination & upsert logic. |
+| **REST Endpoints** | API Access |  Complete | List, Filter, and Detail views active. |
+| **Base Schema** | Data Model |  Complete | Basics + Investment fields implemented. |
 ---
 
-### **Phase 2 Preview (depreceated)** 
-
-* **Playwright Scraper**: Target "Leadership" pages of PortCo sites.
-* **Apollo.io Adapter**: Fetch employee headcount to identify high-growth assets.
-* **Aggregated Analytics**: DB views for industry dominance and regional shifts.
 
 ## Phase 2: The "data enrichment" Phase -
 
@@ -90,44 +80,6 @@ Navigate to http://localhost:3000/api/ to manually trigger syncs
     - these names wiht KKR tag can be used to fetch content from secform4.com to get personal investment details
     - tracxn has some enriching portco-peopel mapping data
 
-
-
-## **Not Implemented ->**
-- add a version control to log changes in data fiels (next)
-
-Create a "Worker" to visit individual bio URLs using the first-lastname pattern.
-Extract: Role, Team, 
-Goal: Cross-reference which KKR Executive "controls" which Portfolio Company.
-
-Step 2.2: The News & Market Signal Wrapper (P2)
-Integrate Bing News Search API filtered by "{PortCo Name} + KKR".
-
-Extract: Article Title, URL, Publication Date, and a "Snippet."
-
-Implement a basic Sentiment/Category tag (e.g., "Expansion", "Layoffs", "M&A").
-
-Goal: Provide the "Why" behind the company's current status.
-
-**i can optional add apoloo api at this stage**
-
-Step 2.3: The SEC 8-K Parser (P3)
-Scrape ir.kkr.com  for the latest filings.
-
-Focus specifically on 8-K (Current Report) forms as they trigger for "Material Events" (Acquisitions, Dispositions, Departures).
-
-Use an LLM (Qwen) to extract: "Event Type" and "Financial Impact Summary."
-
-Goal: Formal regulatory verification of portfolio changes.
-
-Phase 3: The "Active Intelligence" Phase (Future)
-Step 3.1: Playwright Scrapers
-Playwright scrapers for individual PortCo websites (Extracting product lists/client logos).
-
-Step 3.2: Apollo/Proxycurl Integration
-Integration of Apollo/Proxycurl for validated headcount and technographic data.
-
-Step 3.3: The "Drift" Engine
-"Drift" Engine: Logic to compare the original KKR thesis vs. current news/website data.
 
 
 ## ## People Engine Architecture - 
@@ -154,3 +106,118 @@ KKR People List Page
 
 Gemini Batching - batch 50 people. KKR has ~600 people → only 12 Gemini calls total for a full scrape. Well within 1500/day free limit. Leaves room for retries without burning quota.
 The prompt returns an array of 50 results keyed by personSlug so you can match results back to inputs exactly.
+
+
+
+syncStatus State Machine
+[Existing API]                          [New Enrichment Pipeline]
+      │
+      ▼
+ 'pending'           ← person created, no bio yet
+      │
+      ▼ (Phase 1: bio scraper)
+ 'bio_fetching'      ← actively being fetched right now (crash recovery)
+      │
+      ├──(success)──►'bio_fetched'     ← rawBiography written, queued for Gemini
+      │
+      └──(fail)─────►'bio_failed'      ← HTTP error on bio page, retryable
+                          │
+                          ▼ (Phase 2: Gemini batch)
+                     'enriching'        ← in active Gemini batch (crash recovery)
+                          │
+                     ┌────┴────┐
+                     ▼         ▼
+                 'synced'   'enrich_failed'  ← Gemini failed or parse error
+
+
+
+## The pipeline has 2 phases, triggered manually via HTTP.
+### Phase 1 — Bio Fetching
+POST /enrichment/run → EnrichmentService.runBioFetchPhase()
+
+Queries MongoDB for all people with syncStatus: pending | bio_failed who have a sources.kkrUrl
+Marks them all bio_fetching immediately (crash recovery — if server dies mid-run, these won't get stuck)
+Hands the batch to KkrPersonScraperStrategy.fetchBioBatch() which runs 3 concurrent HTTP requests to KKR bio pages, with 1500ms + random jitter between batches, retrying up to 3x with exponential backoff (3s → 9s → 27s)
+On success: writes rawBiography text to the Person doc, sets bio_fetched
+On failure: sets bio_failed with the error message — retryable next run
+
+### Phase 2 — Gemini Enrichment
+Runs immediately after Phase 1 in the same runFullPipeline() call.
+
+It now correctly uses 3 parallel "workers" to handle batches of 10 people, which should prevent those 60000ms timeout errors.
+
+Queries all people with syncStatus: bio_fetched | enrich_failed
+Marks them enriching
+Sends to GeminiBioParserService in batches of 10 with 2s between calls — for 1027 people that's ~103 Gemini API calls total (NEEDS optimisation)
+Gemini returns a JSON object keyed by personSlug with portcos[], boardRoles[], priorFirms[], education[]
+For each portco name returned: PortfolioMatcherService fuzzy-matches it against your Portfolio collection using Dice coefficient similarity (threshold 0.75). Hit → links to real Portfolio. Miss → creates a stub Portfolio
+Upserts PersonPortco junction documents with role, dates, match confidence
+Sets person to synced with lastEnrichedAt timestamp
+
+## Output Phase 2- 
+### File Description Phase 2 - additions(New)
+      person-portco.schema.ts - junction collection
+      kkr-person-scraper.strategy.ts - fetches bio HTML per person
+      gemini-bio-parser.service.ts - batches 50 people → Gemini → structured JSON
+      portfolio-matcher.service.ts - fuzzy match portco names → Portfolio docs
+      enrichment.service.ts - orchestrates the whole pipeline
+      enrichment.controller.ts - HTTP trigger endpoints
+      enrichment.module.ts - wires it all together
+      person-portco.service.ts + person-portco.controller.ts + person-portco.module.ts
+  **Updated:**
+      person.schema.ts - expand syncStatus to full state machine
+      app.module.ts - add EnrichmentModule, PersonPortcoModule`
+
+note-  gp-person-scraper.interface.ts — this defines the contract that KkrPersonScraperStrategy (and future scrapers for other GPs like Apollo, Carlyle etc.) must implement. it is the interface that makes the strategy pattern actually work when i will scale beyond KKR.
+
+**The pipeline is fully idempotent — you can re-run it and it'll only pick up pending/bio_failed/enrich_failed people, skipping anyone already synced.**
+
+
+
+
+# API Documentation
+
+## Scraper
+Endpoints for data ingestion and synchronization from source targets.
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| POST | `/scraper/sync-kkr` | Scrape KKR portfolio companies, upsert into Portfolio collection |
+| POST | `/scraper/sync-kkr-people` | Scrape KKR people list pages, upsert into Person collection with syncStatus: pending |
+
+## People
+Endpoints for retrieving and searching personnel records.
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| GET | `/people` | All people, sorted by name. Supports `?limit=100` |
+| GET | `/people/count` | Total person documents |
+| GET | `/people/search` | Case-insensitive name search via `?name=` |
+
+## Enrichment
+Endpoints for the AI processing pipeline and status monitoring.
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| POST | `/enrichment/run` | Main trigger. Runs full pipeline (Phase 1 + Phase 2) in background. Returns immediately. |
+| POST | `/enrichment/run/bio-fetch` | Phase 1 only — fetch bio HTML for pending/bio_failed people |
+| POST | `/enrichment/run/enrich` | Phase 2 only — run Gemini on bio_fetched/enrich_failed people |
+| GET | `/enrichment/status` | Pipeline health — count of people per syncStatus + total PersonPortco docs |
+
+## Person ↔ PortCo Relationships
+Endpoints for managing the junction records between individuals and portfolio companies.
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| GET | `/person-portco` | All junction records. Supports `?limit=100` |
+| GET | `/person-portco/count` | Total relationships created |
+| GET | `/person-portco/by-person/:personSlug` | All portcos linked to a specific person |
+| GET | `/person-portco/by-portfolio/:externalId` | All people linked to a specific portfolio company |
+
+
+Note/UPDATE--
+Strategy: Replaced the recursive next() with a while loop worker. This prevents the "hanging" or "crashing" you might see after a few dozen items.
+
+Service: Added bio_fetching to the query to ensure that if the process dies, it doesn't leave those records in "limbo" forever.
+
+Performance: Switched to bulkWrite to reduce the number of trips to the database from 1,079 to 1.

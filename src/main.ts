@@ -6,9 +6,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   const config = new DocumentBuilder()
-    .setTitle('KKR Portfolio API')
+    .setTitle('Jerry for berry')
     .setDescription('Scraper and Portfolio Management API')
-    .setVersion('1.0')
+    .setVersion('3.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);

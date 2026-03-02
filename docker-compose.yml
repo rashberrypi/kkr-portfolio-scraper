@@ -11,7 +11,9 @@ services:
 
   # NestJS App Service
   app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     container_name: kkr_app
     ports:
       - "8080:8080"
@@ -20,16 +22,16 @@ services:
     depends_on:
       - mongodb
     volumes:
-      - .:/usr/src/appx
+      - .:/usr/src/app
       - /usr/src/app/node_modules
     environment:
       - PORT=8080
       - NODE_TLS_REJECT_UNAUTHORIZED=0
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
+      - MONGO_URI=mongodb://mongodb:27017/kkr-portfolio-scraper
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health', (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1) }).on('error', () => process.exit(1))"] 
       timeout: 10s
       retries: 3
       start_period: 10s

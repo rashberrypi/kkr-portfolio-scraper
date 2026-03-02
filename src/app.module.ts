@@ -5,6 +5,8 @@ import { AppController } from './app.controller';
 import { PortfolioModule } from './modules/portfolio/portfolio.module';
 import { ScraperModule } from './modules/scraper/scraper.module';
 import { PersonModule } from './modules/person/person.module';
+import { EnrichmentModule } from './modules/enrichment/enrichment.module';
+import { PersonPortcoModule } from './modules/person-portco/person-portco.module';
 
 @Module({
   imports: [
@@ -18,7 +20,9 @@ import { PersonModule } from './modules/person/person.module';
     }),
     PortfolioModule,
     ScraperModule,
-    PersonModule
+    PersonModule,
+    EnrichmentModule,
+    PersonPortcoModule,
   ],
   controllers: [AppController], 
   providers: [],

@@ -16,6 +16,7 @@ export class PersonController {
             .find()
             .limit(Number(limit))
             .sort({ fullName: 1 })
+            .lean()
             .exec();
     }
 
@@ -31,6 +32,7 @@ export class PersonController {
     async searchPeople(@Query('name') name: string) {
         return this.personModel
             .find({ fullName: new RegExp(name, 'i') })
+            .lean()
             .exec();
     }
 }

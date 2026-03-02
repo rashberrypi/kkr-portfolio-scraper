@@ -1,39 +1,46 @@
 #!/bin/bash
 set -e
 
-# 1. Environment Setup
-echo "🚀 KKR Scraper - Local Development Setup"
-export NODE_TLS_REJECT_UNAUTHORIZED=0
+echo "🚀 KKR Scraper - Optimized Setup"
 
-# 2. Sync Dependencies
-echo "📦 Installing npm dependencies..."
-npm install
-
-# 3. Check Docker
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker is not running. Please start Docker."
-    exit 1
+# 1. Kill the zombie process on 8080 (Fixes EACCES)
+echo "🔍 Clearing port 8080..."
+# Using a more robust Git Bash friendly way to kill the port
+PID=$(netstat -ano | grep :8080 | awk '{print $5}' | sort -u | head -n 1)
+if [ ! -z "$PID" ] && [ "$PID" -gt 0 ]; then
+    taskkill //F //PID $PID 2>/dev/null || true
 fi
 
-# 4. Start Infrastructure (Without deleting data)
-echo "📦 Starting Docker containers..."
-# This starts MongoDB and builds your NestJS app
-docker-compose up --build -d
 
-# 5. Wait for API to be ready
+# 2. Run local install (Updates package-lock.json if you added new imports)
+echo "📦 Updating local dependencies..."
+npm install --prefer-offline
+
+
+
+# 3. Start Docker (Building only if files changed)
+echo "🆙 Starting Docker containers..."
+docker-compose up -d --build
+
+
+
+# 4. Wait for API Health
 echo "⏳ Waiting for API to be healthy..."
 until curl -s -I http://localhost:8080/health | grep "200 OK" > /dev/null; do
     printf '.'
     sleep 2
 done
 
-echo -e "\n✅ App is live on http://localhost:8080/api"
 
-# 6. Trigger Sync (Only if you want it to run on every start)
-echo "🔄 Triggering KKR Sync..."
+
+echo -e "\n✅ App is live! Triggering KKR Sync..."
 curl -X POST http://localhost:8080/scraper/sync/kkr
 
 echo ""
 echo "🎉 Development environment is ready!"
 echo "• Swagger UI: http://localhost:8080/api"
 echo "• Health:     http://localhost:8080/health"
+
+echo "📜 Attaching to logs (Press Ctrl+C to stop viewing, container will keep running)..."
+docker-compose logs -f app
+

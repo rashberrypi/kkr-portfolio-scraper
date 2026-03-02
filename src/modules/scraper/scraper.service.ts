@@ -41,6 +41,7 @@ export class ScraperService {
             name: item.name,
             sourceGp: 'KKR', //Hard-coded : change when scaling to more GPs
             website: item.url,
+            syncStatus: 'synced',   
             basics: {
               hq: item.hq,
               industry: item.industry,

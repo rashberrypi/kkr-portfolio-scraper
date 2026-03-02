@@ -15,6 +15,15 @@ class PersonFingerprints {
     @Prop() linkedInId?: string;    // Permanent LinkedIn Numerical ID
 }
 
+export type PersonSyncStatus =
+    | 'pending'
+    | 'bio_fetching'
+    | 'bio_fetched'
+    | 'bio_failed'
+    | 'enriching'
+    | 'synced'
+    | 'enrich_failed';
+
 @Schema({ timestamps: true })
 export class Person extends Document {
     @Prop({ required: true, unique: true })
@@ -24,7 +33,7 @@ export class Person extends Document {
     fullName: string;
     @Prop({ type: PersonFingerprints })
     fingerprints: PersonFingerprints;
-    
+
     @Prop() currentTitle: string;
     @Prop() primaryTeam: string;
     @Prop() officeLocation: string;
@@ -36,11 +45,25 @@ export class Person extends Document {
     @Prop({ required: true })
     currentGp: string;
 
-    @Prop()
+    @Prop({ default: '' })
     rawBiography: string;
 
-    @Prop({ default: 'pending' })
-    syncStatus: 'pending' | 'synced' | 'failed';
+    @Prop({
+        default: 'pending',
+        enum: ['pending', 'bio_fetching', 'bio_fetched', 'bio_failed', 'enriching', 'synced', 'enrich_failed'],
+    })
+    syncStatus: PersonSyncStatus;
+
+    @Prop({ default: '' })
+    syncError?: string;
+
+    @Prop()
+    lastEnrichedAt?: Date;
 }
 
-export const PersonSchema = SchemaFactory.createForClass(Person);   
+
+export const PersonSchema = SchemaFactory.createForClass(Person);
+
+// Indexes for pipeline queries
+PersonSchema.index({ syncStatus: 1 });
+PersonSchema.index({ currentGp: 1, syncStatus: 1 });
