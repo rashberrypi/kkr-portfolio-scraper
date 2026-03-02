@@ -7,6 +7,7 @@ import { ScraperModule } from './modules/scraper/scraper.module';
 import { PersonModule } from './modules/person/person.module';
 import { EnrichmentModule } from './modules/enrichment/enrichment.module';
 import { PersonPortcoModule } from './modules/person-portco/person-portco.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PersonPortcoModule } from './modules/person-portco/person-portco.module
       }),
       inject: [ConfigService],
     }),
+    AnalyticsModule,
     PortfolioModule,
     ScraperModule,
     PersonModule,

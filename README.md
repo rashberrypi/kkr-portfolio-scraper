@@ -221,3 +221,36 @@ Strategy: Replaced the recursive next() with a while loop worker. This prevents 
 Service: Added bio_fetching to the query to ensure that if the process dies, it doesn't leave those records in "limbo" forever.
 
 Performance: Switched to bulkWrite to reduce the number of trips to the database from 1,079 to 1.
+
+# Engineering Roadmap - TO DOS:
+- granularise office location to(city, country, region..) for each person
+
+## Phase 3: Technical Debt & Status Fixes (Current)
+Focus: Stability, concurrency, and developer experience.
+
+### Enrichment & Syncing
+* Enrichment Locking: Implement record locking by marking records as 'enriching' before API dispatch to prevent worker collisions.
+* Failure Handling: Ensure failed batches are explicitly tagged 'enrich_failed' with a 'syncError' payload; eliminate false-positive synced statuses.
+
+### Data & Codebase Cleanup
+* Stub Management: Standardize auto-generated portfolio stubs with source: 'people' and investmentStatus: 'inactive'.
+* Mongoose Refactor: Update all findOneAndUpdate calls to use { returnDocument: 'after' } to resolve deprecation warnings.
+
+### Logging & Observability
+* Progress Tracking: Update GeminiBioParserService to log global progress (e.g., Batch 5/103) instead of local chunk progress.
+
+---
+
+## Phase 4: Data Expansion & Efficiency
+Focus: New data verticals, auditability, and LLM optimization.
+
+### Data Governance
+* Delta Tracker: Implement a versioning system to track change history (user, timestamp, and field-level diffs) for person/company records.
+
+### Scoping & Integration
+* SEC Filing Scraper: Build a dedicated worker for SEC Edgar to track institutional ownership and executive movements.
+* Multi-Source Integration: Deploy secondary scraping layers via Bing (news/web) and Apollo API (contact/firmographic data).
+
+### Gemini Optimization
+* Efficiency: Refine prompt token usage and optimize batch sizes for cost/speed balance.
+* Resiliency: Increase timeouts to 120s to minimize unnecessary retries on complex reasoning tasks.

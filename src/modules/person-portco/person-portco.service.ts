@@ -19,8 +19,8 @@ export class PersonPortcoService {
         return this.personPortcoModel.find({ portfolioExternalId }).lean();
     }
 
-    async getAll(limit = 100) {
-        return this.personPortcoModel.find().limit(limit).lean();
+    async getAll() {
+        return this.personPortcoModel.find().lean();
     }
 
     async getCount() {

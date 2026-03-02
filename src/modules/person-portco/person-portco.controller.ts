@@ -6,8 +6,8 @@ export class PersonPortcoController {
     constructor(private readonly personPortcoService: PersonPortcoService) {}
 
     @Get()
-    getAll(@Query('limit') limit = 100) {
-        return this.personPortcoService.getAll(Number(limit));
+    getAll() {
+        return this.personPortcoService.getAll();
     }
 
     @Get('count')
