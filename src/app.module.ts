@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AppController } from './app.controller'; 
+import { AppController } from './app.controller';
 import { PortfolioModule } from './modules/portfolio/portfolio.module';
 import { ScraperModule } from './modules/scraper/scraper.module';
 import { PersonModule } from './modules/person/person.module';
@@ -11,7 +11,10 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env'
+    }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -26,7 +29,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     EnrichmentModule,
     PersonPortcoModule,
   ],
-  controllers: [AppController], 
+  controllers: [AppController],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }

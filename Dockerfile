@@ -1,13 +1,13 @@
-FROM node:20-alpine
-
-WORKDIR /usr/src/app
-
-# Copy package files first to cache the 'npm install' layer
+FROM node:20-alpine AS builder
+WORKDIR /app
 COPY package*.json ./
-# This runs once during 'build' and creates the Linux node_modules
 RUN npm install
-
-# Copy your code
 COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 8080
-CMD ["npm", "run", "start:dev"]
+CMD ["node", "dist/main"]
