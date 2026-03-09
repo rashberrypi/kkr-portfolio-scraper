@@ -4,14 +4,14 @@ import { Model } from 'mongoose';
 import { Person } from '../person/schemas/person.schema';
 import { PersonPortco } from '../person-portco/schemas/person-portco.schema';
 import { KkrPersonScraperStrategy } from './strategies/kkr/kkr-person-scraper.strategy';
-import { GeminiBioParserService } from './providers/gemini-bio-parser.service';
+import { GeminiBioParserService, GeminiPersonResult } from './providers/gemini-bio-parser.service';
 import { PortfolioMatcherService } from './matchers/portfolio-matcher.service';
 import { AnyBulkWriteOperation } from 'mongodb';
 
 @Injectable()
 export class EnrichmentService {
     private readonly logger = new Logger(EnrichmentService.name);
-
+    private readonly BATCH_SIZE = 110;
     constructor(
         @InjectModel(Person.name) private personModel: Model<Person>,
         @InjectModel(PersonPortco.name) private personPortcoModel: Model<PersonPortco>,
@@ -87,80 +87,28 @@ export class EnrichmentService {
             rawBiography: { $exists: true, $ne: '' },
         }).lean();
 
-        this.logger.log(`Phase 2: ${people.length} people to enrich`);
         if (!people.length) return { synced: 0, failed: 0 };
 
-        let synced = 0;
-        let failed = 0;
+        // 1. First Pass (Initial Sweep)
+        const { results, failedSlugs } = await this.executeBatchProcess(people, "Phase 1");
 
-        const CHUNK_SIZE = 10;
+        // 2. Second Pass (Retry failures)
+        if (failedSlugs.length > 0) {
+            this.logger.log(`🔄 Retrying ${failedSlugs.length} failed people...`);
+            const retryPeople = people.filter(p => failedSlugs.includes(p.personSlug));
+            const retryPass = await this.executeBatchProcess(retryPeople, "Phase 2 (Retry)");
 
-        for (let i = 0; i < people.length; i += CHUNK_SIZE) {
-            const chunk = people.slice(i, i + CHUNK_SIZE);
-            const slugs = chunk.map(p => p.personSlug);
-
-            // 1. Mark this specific chunk as 'enriching' (Locking)
-            await this.personModel.updateMany(
-                { personSlug: { $in: slugs } },
-                { $set: { syncStatus: 'enriching' } }
-            );
-
-            try {
-                const geminiInput = chunk.map(p => ({
-                    personSlug: p.personSlug,
-                    rawBiography: p.rawBiography,
-                }));
-
-                // 2. Call Gemini - If this fails, it jumps to 'catch' for this specific chunk
-                const geminiResults = await this.geminiParser.parseBatch(geminiInput);
-
-                // 3. Process results for this chunk
-                for (const person of chunk) {
-                    const parsed = geminiResults.get(person.personSlug);
-
-                    const hasData = parsed && (
-                        parsed.portcos?.length > 0 ||
-                        parsed.boardRoles?.length > 0 ||
-                        parsed.priorFirms?.length > 0 ||
-                        parsed.education?.length > 0 ||
-                        parsed.role !== null
-                    );
-
-                    if (!hasData) {
-                        // This triggers the 'catch' block for the 10-person chunk
-                        throw new Error(`Gemini returned empty or missing data for ${person.personSlug}`);
-                    }
-
-                    // Link to portcos (only runs if we have data)
-                    await this.upsertPortcoRelationships(person, parsed);
-
-                    // Mark successful ONLY if we have confirmed data
-                    await this.personModel.updateOne(
-                        { personSlug: person.personSlug },
-                        {
-                            $set: {
-                                syncStatus: 'synced',
-                                lastEnrichedAt: new Date(),
-                                syncError: null
-                            }
-                        }
-                    );
-                    synced++;
-                }
-            } catch (err) {
-                this.logger.error(`Batch starting with ${slugs[0]} failed: ${err.message}`);
-
-                // 4. On failure, mark ONLY the current chunk as 'enrich_failed'
+            // Final update for anything that STILL failed
+            const stillFailed = retryPass.failedSlugs;
+            if (stillFailed.length > 0) {
                 await this.personModel.updateMany(
-                    { personSlug: { $in: slugs } },
-                    { $set: { syncStatus: 'enrich_failed', syncError: err.message } }
+                    { personSlug: { $in: stillFailed } },
+                    { $set: { syncStatus: 'enrich_failed', syncError: 'AI failed retry' } }
                 );
-                failed += chunk.length;
             }
         }
 
-        this.logger.log(`Phase 2 complete: ${synced} synced, ${failed} failed`);
-        return { synced, failed };
+        return { synced: results.size, failed: failedSlugs.length };
     }
 
     /**
@@ -172,6 +120,41 @@ export class EnrichmentService {
         const phase2 = await this.runEnrichmentPhase(gp);
         this.logger.log('✅ Pipeline complete');
         return { phase1, phase2 };
+    }
+    
+    private async executeBatchProcess(people: any[], label: string) {
+        const results = new Map<string, GeminiPersonResult>();
+        const failedSlugs: string[] = [];
+
+        for (let i = 0; i < people.length; i += this.BATCH_SIZE) {
+            const chunk = people.slice(i, i + this.BATCH_SIZE);
+            const slugs = chunk.map(p => p.personSlug);
+
+            this.logger.log(`[${label}] Batch ${Math.floor(i / this.BATCH_SIZE) + 1}/${Math.ceil(people.length / this.BATCH_SIZE)} processing...`);
+
+            try {
+                await this.personModel.updateMany({ personSlug: { $in: slugs } }, { $set: { syncStatus: 'enriching' } });
+
+                const batchResults = await this.geminiParser.callGemini(chunk);
+
+                for (const person of chunk) {
+                    const parsed = batchResults.get(person.personSlug);
+                    if (parsed) {
+                        await this.upsertPortcoRelationships(person, parsed);
+                        await this.personModel.updateOne({ personSlug: person.personSlug }, { $set: { syncStatus: 'synced', lastEnrichedAt: new Date() } });
+                        results.set(person.personSlug, parsed);
+                    } else {
+                        failedSlugs.push(person.personSlug);
+                    }
+                }
+            } catch (err) {
+                this.logger.error(`Batch failed: ${err.message}`);
+                failedSlugs.push(...slugs);
+            }
+            // 5 second gap to prevent rate limits
+            await new Promise(r => setTimeout(r, 5000));
+        }
+        return { results, failedSlugs };
     }
 
     private async upsertPortcoRelationships(person: any, parsed: any) {

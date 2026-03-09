@@ -144,15 +144,17 @@ On failure: sets bio_failed with the error message — retryable next run
 ### Phase 2 — Gemini Enrichment
 Runs immediately after Phase 1 in the same runFullPipeline() call.
 
-It now correctly uses 3 parallel "workers" to handle batches of 10 people, which should prevent those 60000ms timeout errors.
+- Phase 1 (The Sweep): Try to process all 1,029 people in batches of 110. Collect all the "leftovers" (people who failed or were skipped due to partial JSON parsing).
+- Phase 2 (The Cleanup): Once the first pass is finished, take only those specific failed slugs and run them in a final set of "retry batches."
 
-Queries all people with syncStatus: bio_fetched | enrich_failed
-Marks them enriching
-Sends to GeminiBioParserService in batches of 10 with 2s between calls — for 1027 people that's ~103 Gemini API calls total (NEEDS optimisation)
+Queries all people with syncStatus: bio_fetched | enrich_failed 
+      Marks them enriching
+
+Sends to GeminiBioParserService in batches of 110 
+
 Gemini returns a JSON object keyed by personSlug with portcos[], boardRoles[], priorFirms[], education[]
-For each portco name returned: PortfolioMatcherService fuzzy-matches it against your Portfolio collection using Dice coefficient similarity (threshold 0.75). Hit → links to real Portfolio. Miss → creates a stub Portfolio
-Upserts PersonPortco junction documents with role, dates, match confidence
-Sets person to synced with lastEnrichedAt timestamp
+For each portco name returned: PortfolioMatcherService fuzzy-matches it against your Portfolio collection using Dice coefficient similarity (threshold 0.75). Hit → links to real Portfolio. 
+      Miss → creates a stub Portfolio
 
 ## Output Phase 2- 
 ### File Description Phase 2 - additions(New)
